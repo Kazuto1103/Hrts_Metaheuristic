@@ -1,0 +1,23 @@
+{
+  "algorithm": "PSO",
+  "timestamp": "2025-11-27T05:29:26.145635",
+  "best_thresholds": {
+    "normal_min": 59.91655539424797,
+    "normal_max": 80.0,
+    "elevated_max": 122.80342270701655
+  },
+  "metrics": {
+    "accuracy": 0.9,
+    "precision": 1.0,
+    "recall": 0.9,
+    "f1_score": 0.9473684210526316
+  },
+  "confusion_matrix": {
+    "TP": 9,
+    "TN": 0,
+    "FP": 0,
+    "FN": 1
+  },
+  "best_fitness": 0.9,
+  "total_iterations": 100
+}

@@ -1,0 +1,27 @@
+{
+  "algorithm": "ACO",
+  "timestamp": "2025-11-27T05:30:44.141904",
+  "selected_features": [
+    0,
+    1,
+    6,
+    9,
+    16
+  ],
+  "n_selected_features": 5,
+  "total_features": 18,
+  "metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0
+  },
+  "confusion_matrix": {
+    "TP": 10,
+    "TN": 0,
+    "FP": 0,
+    "FN": 0
+  },
+  "best_fitness": 0.9444444444444444,
+  "total_iterations": 50
+}
