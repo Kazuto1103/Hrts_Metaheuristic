@@ -61,25 +61,21 @@ class BPMVisualizer:
             save_path: path untuk save figure
         """
         timeline = subject_data['timeline']
-        abnormal = subject_data['classifications']['abnormal_bpm_readings']
         
         # Extract data
         seconds = [reading['second'] for reading in timeline]
         bpms = [reading['bpm'] for reading in timeline]
         classifications = [reading['classification'] for reading in timeline]
         
-        # Convert abnormal to dict untuk quick lookup
-        abnormal_seconds = {abn['second'] for abn in abnormal}
-        
         # Create figure dengan ukuran yang bagus
         fig, ax = plt.subplots(figsize=(14, 6))
         
-        # Separate normal dan abnormal
+        # Separate normal dan abnormal berdasarkan classification di timeline
         normal_seconds, normal_bpms = [], []
         abnormal_s, abnormal_b = [], []
         
-        for sec, bpm in zip(seconds, bpms):
-            if sec in abnormal_seconds:
+        for sec, bpm, classification in zip(seconds, bpms, classifications):
+            if classification == 'abnormal' or classification == 'tachycardia' or classification == 'bradycardia':
                 abnormal_s.append(sec)
                 abnormal_b.append(bpm)
             else:

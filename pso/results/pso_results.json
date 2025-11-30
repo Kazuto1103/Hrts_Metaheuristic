@@ -1,23 +1,21 @@
 {
   "algorithm": "PSO",
-  "timestamp": "2025-11-27T05:29:26.145635",
-  "best_thresholds": {
-    "normal_min": 59.91655539424797,
-    "normal_max": 80.0,
-    "elevated_max": 122.80342270701655
+  "timestamp": "2025-11-30T10:57:06.907224",
+  "optimized_thresholds": {
+    "normal_upper": 68.43872934209107,
+    "abnormal_lower": 96.59137169623747
   },
   "metrics": {
-    "accuracy": 0.9,
+    "accuracy": 1.0,
     "precision": 1.0,
-    "recall": 0.9,
-    "f1_score": 0.9473684210526316
+    "recall": 1.0,
+    "f1_score": 1.0
   },
   "confusion_matrix": {
-    "TP": 9,
-    "TN": 0,
+    "TP": 2,
+    "TN": 38,
     "FP": 0,
-    "FN": 1
+    "FN": 0
   },
-  "best_fitness": 0.9,
-  "total_iterations": 100
+  "best_fitness": 1.0
 }

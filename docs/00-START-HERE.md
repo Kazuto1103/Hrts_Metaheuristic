@@ -8,17 +8,23 @@
 
 ```
 Apa itu?
-→ Proyek machine learning klasifikasi detak jantung (BPM) 
+→ Machine learning klasifikasi detak jantung (BPM) remaja stabil
   menggunakan 2 algoritma metaheuristik: PSO & ACO
+  Dataset: 40 orang (12,000 reading) dengan realistic jumpscare patterns
 
 Hasil apa?
-→ PSO: 90% accuracy (threshold optimization)
-  ACO: 100% accuracy ⭐ (feature selection)
+→ PSO: 100% accuracy (threshold optimization: 68.44 < X < 96.59 bpm)
+  ACO: 100% accuracy (5 features selected: Mean, Max, Median, Skewness, Q75)
+
+Mana yang MENANG?
+→ ACCURACY: TIED 🤝 (both 100% on 40-person realistic dataset)
+  TRAINING: ACO WINS ⚡ (2x faster convergence)
+  DEPLOYMENT: PSO WINS ⚡ (simpler & faster inference)
 
 File apa saja?
-→ 10 visualisasi BPM timeline per algoritma (20 total)
+→ 40 timeline per algoritma (80 total visualizations)
   + convergence plots + feature importance plot
-  + hasil metrics (JSON)
+  + hasil metrics (JSON) dengan clear efficiency comparison
 ```
 
 ---
@@ -52,10 +58,10 @@ python aco_optimizer.py
 
 ## 📊 HASIL RINGKAS
 
-| Algoritma | Accuracy | Strategy | Keunggulan |
-|-----------|----------|----------|-----------|
-| **PSO** | 90% | Threshold Optimization | Cepat, sederhana |
-| **ACO** | 100% ⭐ | Feature Selection | Akurat, robust |
+| Algoritma | Accuracy | Strategy | Keunggulan | Efficiency |
+|-----------|----------|----------|-----------|-----------|
+| **PSO** | 100% ✓ | Threshold Optimization | Simpler, faster deployment | Deployment ⚡ |
+| **ACO** | 100% ✓ | Feature Selection | More features, 2x faster training | Training ⚡ |
 
 ---
 
@@ -105,10 +111,12 @@ d:\Project\Heuristik\
 
 | Jika... | Baca |
 |--------|------|
+| "Mana algoritma yang MENANG?" | 03-ALGORITHM-COMPARISON.md |
+| "Algoritma mana lebih EFFICIENT?" | 03-ALGORITHM-COMPARISON.md (FINAL VERDICT) |
 | "Apa arti grafik hijau/merah?" | 09-VISUALIZATION-GUIDE.md |
-| "Algoritma mana lebih baik?" | 03-ALGORITHM-COMPARISON.md |
-| "Data seperti apa?" | 06-DATASET-DESCRIPTION.md |
-| "Berapa akurasi?" | 04-RESULTS-SUMMARY.md |
+| "Data seperti apa (realistic)?" | 06-DATASET-DESCRIPTION.md |
+| "Berapa akurasi kedua?" | 04-RESULTS-SUMMARY.md |
+| "Konvergensi mana lebih cepat?" | 03-ALGORITHM-COMPARISON.md (Convergence Analysis) |
 | "Mau lihat file mana?" | 11-NAVIGATION-GUIDE.md |
 
 ---

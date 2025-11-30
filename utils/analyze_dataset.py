@@ -1,25 +1,27 @@
 import json
 import numpy as np
 from collections import defaultdict
+from pathlib import Path
 
 def analyze_optimized_dataset():
     """
     Analisis dataset yang sudah dioptimalkan untuk memberikan insights
     """
-    with open('dataset_bpm_optimized.json', 'r') as f:
+    dataset_path = Path(__file__).parent.parent / 'datasets' / 'dataset_bpm_optimized.json'
+    with open(dataset_path, 'r') as f:
         data = json.load(f)
     
     print("=" * 70)
     print("📊 ANALISIS DATASET BPM TEROPTIMALKAN")
     print("=" * 70)
-    
+
     # Summary statistics
     all_bpm = []
     all_abnormal = []
     gender_distribution = defaultdict(int)
     location_distribution = defaultdict(int)
     classification_count = defaultdict(int)
-    
+
     for person_key, person_data in data.items():
         print(f"\n👤 {person_key.upper()}")
         print("-" * 70)
@@ -145,7 +147,8 @@ def generate_feature_matrix():
     """
     Buat feature matrix untuk training PSO/ACO
     """
-    with open('dataset_bpm_optimized.json', 'r') as f:
+    dataset_path = Path(__file__).parent.parent / 'datasets' / 'dataset_bpm_optimized.json'
+    with open(dataset_path, 'r') as f:
         data = json.load(f)
     
     print("\n" + "=" * 70)
@@ -190,14 +193,15 @@ def generate_feature_matrix():
     
     # Save to CSV
     import csv
-    with open('feature_matrix.csv', 'w', newline='') as f:
+    csv_path = Path(__file__).parent.parent / 'datasets' / 'feature_matrix.csv'
+    with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         header = features_list + ['gender', 'age_norm', 'abnormal_pct', 'label']
         writer.writerow(header)
         for i, row in enumerate(feature_matrix):
             writer.writerow(row + [labels[i]])
     
-    print(f"  ✓ Saved to: feature_matrix.csv")
+    print(f"  ✓ Saved to: {csv_path}")
     
     return feature_matrix, labels
 

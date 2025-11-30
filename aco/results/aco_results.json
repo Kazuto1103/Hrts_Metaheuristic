@@ -1,15 +1,15 @@
 {
   "algorithm": "ACO",
-  "timestamp": "2025-11-27T05:30:44.141904",
+  "timestamp": "2025-11-30T10:56:42.167571",
   "selected_features": [
     0,
-    1,
-    6,
-    9,
-    16
+    3,
+    4,
+    10,
+    13
   ],
   "n_selected_features": 5,
-  "total_features": 18,
+  "total_features": 15,
   "metrics": {
     "accuracy": 1.0,
     "precision": 1.0,
@@ -17,11 +17,10 @@
     "f1_score": 1.0
   },
   "confusion_matrix": {
-    "TP": 10,
-    "TN": 0,
+    "TP": 2,
+    "TN": 38,
     "FP": 0,
     "FN": 0
   },
-  "best_fitness": 0.9444444444444444,
-  "total_iterations": 50
+  "best_fitness": 0.9333333333333333
 }

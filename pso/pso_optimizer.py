@@ -1,219 +1,138 @@
 """
-PSO (Particle Swarm Optimization) Algorithm untuk BPM Classification
-Mengoptimalkan threshold untuk klasifikasi normal vs abnormal
+PSO (Particle Swarm Optimization) - FINAL OPTIMIZED VERSION
+Threshold Optimization & BPM Classification dengan Timeline Visualization 1-40
 """
 
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import sys
+import json
 from datetime import datetime
+import matplotlib.pyplot as plt
 
-# Add parent directory to path untuk import helper
 sys.path.insert(0, str(Path(__file__).parent.parent / 'utils'))
 
 from helper import (
-    DataLoader, BPMVisualizer, MetricsCalculator, 
+    DataLoader, BPMVisualizer, MetricsCalculator,
     create_output_directory, print_section, print_metrics
 )
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix as sk_confusion_matrix
 
 
 class PSO:
-    """Particle Swarm Optimization untuk BPM Threshold Optimization"""
+    """Particle Swarm Optimization untuk Threshold Optimization & BPM Classification"""
     
-    def __init__(self, n_particles=20, n_dimensions=3, max_iterations=100,
-                 w=0.7, c1=1.5, c2=1.5):
-        """
-        Initialize PSO
-        
-        Args:
-            n_particles: Jumlah particles dalam swarm
-            n_dimensions: Jumlah dimensi (parameter) yang dioptimalkan
-            max_iterations: Jumlah iterasi maksimal
-            w: Inertia weight (0.7 = bagus untuk balance exploration-exploitation)
-            c1: Cognitive coefficient (particle's own best)
-            c2: Social coefficient (swarm's global best)
-        """
+    def __init__(self, n_particles=20, n_iterations=100, w=0.7, c1=1.5, c2=1.5):
         self.n_particles = n_particles
-        self.n_dimensions = n_dimensions
-        self.max_iterations = max_iterations
+        self.n_iterations = n_iterations
         self.w = w
         self.c1 = c1
         self.c2 = c2
         
-        # Initialize particles
-        # Dimensi: [normal_min, normal_max, elevated_max]
-        # Bounds: normal_min [40-70], normal_max [80-120], elevated_max [100-150]
-        self.positions = np.random.uniform([40, 80, 100], [70, 120, 150], 
-                                          size=(n_particles, n_dimensions))
-        self.velocities = np.random.uniform(-10, 10, size=(n_particles, n_dimensions))
-        
-        # Best positions
-        self.personal_best = self.positions.copy()
-        self.personal_best_fitness = np.full(n_particles, -np.inf)
-        self.global_best = None
-        self.global_best_fitness = -np.inf
-        
-        # History untuk tracking
+        self.best_threshold = None
+        self.best_fitness = -np.inf
         self.fitness_history = []
-        self.position_history = []
+        self.threshold_history = []
     
-    def classify_bpm(self, bpm_value, thresholds):
-        """
-        Klasifikasi BPM berdasarkan thresholds
+    def initialize_particles(self, X, n_thresholds=2):
+        """Initialize particles dengan threshold range dari data"""
+        X_min, X_max = np.min(X), np.max(X)
         
-        Args:
-            bpm_value: nilai BPM
-            thresholds: [normal_min, normal_max, elevated_max]
+        positions = []
+        velocities = []
         
-        Returns:
-            0: normal, 1: abnormal
-        """
-        normal_min, normal_max, elevated_max = thresholds
+        for _ in range(self.n_particles):
+            pos = np.array([
+                np.random.uniform(X_min, (X_min + X_max) / 2),
+                np.random.uniform((X_min + X_max) / 2, X_max)
+            ])
+            
+            vel = np.random.uniform(-5, 5, n_thresholds)
+            positions.append(pos)
+            velocities.append(vel)
         
-        # Ensure valid thresholds
-        if normal_min > normal_max:
-            normal_min, normal_max = normal_max, normal_min
-        
-        if (normal_min <= bpm_value <= normal_max):
-            return 0  # normal
-        else:
-            return 1  # abnormal
+        return np.array(positions), np.array(velocities)
     
-    def fitness_function(self, thresholds, X_features, y_true, method='accuracy'):
-        """
-        Calculate fitness (accuracy) berdasarkan thresholds
+    def evaluate_threshold(self, thresholds, X, y):
+        """Evaluate quality of threshold configuration"""
+        try:
+            y_pred = (X >= thresholds[1]).astype(int)
+            
+            acc = accuracy_score(y, y_pred)
+            f1 = f1_score(y, y_pred, zero_division=0)
+            
+            fitness = 0.7 * f1 + 0.3 * acc
+            return fitness
         
-        Args:
-            thresholds: [normal_min, normal_max, elevated_max]
-            X_features: Feature matrix (mean_bpm)
-            y_true: True labels
-            method: 'accuracy', 'f1', atau 'balanced'
-        
-        Returns:
-            fitness score (0-1)
-        """
-        # Use mean_bpm sebagai primary feature (index 0)
-        mean_bpms = X_features[:, 0]
-        
-        # Predict menggunakan thresholds
-        y_pred = np.array([self.classify_bpm(bpm, thresholds) for bpm in mean_bpms])
-        
-        if method == 'accuracy':
-            fitness = MetricsCalculator.calculate_accuracy(y_true, y_pred)
-        elif method == 'f1':
-            precision = MetricsCalculator.calculate_precision(y_true, y_pred)
-            recall = MetricsCalculator.calculate_recall(y_true, y_pred)
-            fitness = MetricsCalculator.calculate_f1(precision, recall)
-        else:  # balanced
-            # Weighted accuracy yang mempertimbangkan precision dan recall
-            precision = MetricsCalculator.calculate_precision(y_true, y_pred)
-            recall = MetricsCalculator.calculate_recall(y_true, y_pred)
-            accuracy = MetricsCalculator.calculate_accuracy(y_true, y_pred)
-            fitness = (accuracy + precision + recall) / 3
-        
-        return fitness
+        except Exception as e:
+            return 0.0
     
-    def optimize(self, X_features, y_true, verbose=True):
-        """
-        Run PSO optimization
-        
-        Args:
-            X_features: Feature matrix
-            y_true: True labels
-            verbose: Print progress
-        
-        Returns:
-            best_thresholds, best_fitness, history
-        """
+    def optimize(self, X, y, verbose=True):
+        """Run PSO optimization"""
         if verbose:
             print_section("PSO OPTIMIZATION PROCESS")
             print(f"\n  Particles: {self.n_particles}")
-            print(f"  Max Iterations: {self.max_iterations}")
-            print(f"  Inertia Weight (w): {self.w}")
-            print(f"  Cognitive (c1): {self.c1}, Social (c2): {self.c2}")
+            print(f"  Iterations: {self.n_iterations}")
+            print(f"  W: {self.w}, C1: {self.c1}, C2: {self.c2}")
         
-        # Evaluate initial population
-        for i in range(self.n_particles):
-            fitness = self.fitness_function(self.positions[i], X_features, y_true)
-            self.personal_best_fitness[i] = fitness
-            
-            if fitness > self.global_best_fitness:
-                self.global_best_fitness = fitness
-                self.global_best = self.positions[i].copy()
+        positions, velocities = self.initialize_particles(X, n_thresholds=2)
         
-        if verbose:
-            print(f"\n  Initial Best Fitness: {self.global_best_fitness:.4f}")
+        personal_best_pos = positions.copy()
+        personal_best_fit = np.array([-np.inf] * self.n_particles)
         
-        # Main PSO loop
-        for iteration in range(self.max_iterations):
+        global_best_pos = None
+        global_best_fit = -np.inf
+        
+        print("\n📊 Optimizing Thresholds...")
+        
+        for iteration in range(self.n_iterations):
             for i in range(self.n_particles):
-                # Update velocity
-                r1 = np.random.rand(self.n_dimensions)
-                r2 = np.random.rand(self.n_dimensions)
+                fitness = self.evaluate_threshold(positions[i], X, y)
                 
-                self.velocities[i] = (
-                    self.w * self.velocities[i] +
-                    self.c1 * r1 * (self.personal_best[i] - self.positions[i]) +
-                    self.c2 * r2 * (self.global_best - self.positions[i])
-                )
+                if fitness > personal_best_fit[i]:
+                    personal_best_fit[i] = fitness
+                    personal_best_pos[i] = positions[i].copy()
                 
-                # Update position
-                self.positions[i] += self.velocities[i]
-                
-                # Apply bounds
-                self.positions[i] = np.clip(self.positions[i], 
-                                          [40, 80, 100], 
-                                          [70, 120, 150])
-                
-                # Evaluate new position
-                fitness = self.fitness_function(self.positions[i], X_features, y_true)
-                
-                # Update personal best
-                if fitness > self.personal_best_fitness[i]:
-                    self.personal_best_fitness[i] = fitness
-                    self.personal_best[i] = self.positions[i].copy()
-                
-                # Update global best
-                if fitness > self.global_best_fitness:
-                    self.global_best_fitness = fitness
-                    self.global_best = self.positions[i].copy()
+                if fitness > global_best_fit:
+                    global_best_fit = fitness
+                    global_best_pos = positions[i].copy()
             
-            self.fitness_history.append(self.global_best_fitness)
-            self.position_history.append(self.global_best.copy())
+            r1 = np.random.rand(self.n_particles, 2)
+            r2 = np.random.rand(self.n_particles, 2)
             
-            if verbose and (iteration + 1) % 10 == 0:
-                print(f"  Iteration {iteration+1:3d}/{self.max_iterations}: "
-                      f"Best Fitness = {self.global_best_fitness:.4f}")
+            velocities = (self.w * velocities +
+                         self.c1 * r1 * (personal_best_pos - positions) +
+                         self.c2 * r2 * (global_best_pos - positions))
+            
+            positions = positions + velocities
+            
+            X_min, X_max = np.min(X), np.max(X)
+            positions[:, 0] = np.clip(positions[:, 0], X_min, (X_min + X_max) / 2)
+            positions[:, 1] = np.clip(positions[:, 1], (X_min + X_max) / 2, X_max)
+            
+            self.best_threshold = global_best_pos
+            self.best_fitness = global_best_fit
+            self.fitness_history.append(global_best_fit)
+            self.threshold_history.append(global_best_pos.copy())
+            
+            if verbose and (iteration + 1) % 20 == 0:
+                print(f"  Iteration {iteration+1:3d}/{self.n_iterations}: "
+                      f"Fitness = {global_best_fit:.4f}")
         
         if verbose:
             print(f"\n  ✅ Optimization Complete!")
-            print(f"  Final Best Fitness: {self.global_best_fitness:.4f}")
-            print(f"  Optimal Thresholds:")
-            print(f"    Normal Range: {self.global_best[0]:.2f} - {self.global_best[1]:.2f} BPM")
-            print(f"    Elevated Max: {self.global_best[2]:.2f} BPM")
+            print(f"  Final Best Fitness: {global_best_fit:.4f}")
         
-        return self.global_best, self.global_best_fitness, self.fitness_history
-    
-    def predict(self, X_features, thresholds):
-        """Predict menggunakan optimal thresholds"""
-        mean_bpms = X_features[:, 0]
-        y_pred = np.array([self.classify_bpm(bpm, thresholds) for bpm in mean_bpms])
-        return y_pred
+        return global_best_pos, global_best_fit
 
 
-def run_pso_analysis(algorithm_type='standard'):
-    """
-    Run complete PSO analysis untuk semua subjects
+def run_pso_analysis():
+    """Run complete PSO analysis"""
+    print_section("PSO OPTIMIZATION - FINAL VERSION")
+    print(f"\n  Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    Args:
-        algorithm_type: 'standard' atau 'adaptive'
-    """
-    print_section("PSO OPTIMIZATION - BPM CLASSIFICATION")
-    print(f"\n  Algorithm Type: {algorithm_type}")
-    print(f"  Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # Load data
     print("\n📊 Loading Data...")
     data = DataLoader.load_optimized_dataset()
     df = DataLoader.load_feature_matrix()
@@ -224,24 +143,37 @@ def run_pso_analysis(algorithm_type='standard'):
     print(f"  ✓ Loaded {X.shape[0]} samples with {X.shape[1]} features")
     print(f"  ✓ Classes: {np.sum(y==0)} normal, {np.sum(y==1)} abnormal")
     
-    # Run PSO
-    print("\n🔄 Running PSO Optimization...")
-    pso = PSO(n_particles=20, max_iterations=100, w=0.7, c1=1.5, c2=1.5)
-    best_thresholds, best_fitness, fitness_history = pso.optimize(X, y, verbose=True)
+    X_bpm = X[:, 0].reshape(-1, 1).flatten()
     
-    # Evaluate
-    print("\n📈 Evaluation Metrics:")
-    y_pred = pso.predict(X, best_thresholds)
-    accuracy = MetricsCalculator.calculate_accuracy(y, y_pred)
-    precision = MetricsCalculator.calculate_precision(y, y_pred)
-    recall = MetricsCalculator.calculate_recall(y, y_pred)
-    f1 = MetricsCalculator.calculate_f1(precision, recall)
-    cm = MetricsCalculator.calculate_confusion_matrix(y, y_pred)
+    print("\n⚡ Running PSO Optimization...")
+    pso = PSO(n_particles=20, n_iterations=100)
+    best_threshold, best_fitness = pso.optimize(X_bpm, y, verbose=True)
     
-    print_metrics(accuracy, precision, recall, f1, cm)
+    print("\n📈 Evaluation with Optimized Thresholds:")
+    y_pred = (X_bpm >= best_threshold[1]).astype(int)
     
-    # Generate visualizations untuk setiap subject
-    print("\n📊 Generating BPM Timeline Visualizations...")
+    accuracy = accuracy_score(y, y_pred)
+    precision = precision_score(y, y_pred, zero_division=0)
+    recall = recall_score(y, y_pred, zero_division=0)
+    f1 = f1_score(y, y_pred, zero_division=0)
+    
+    cm = sk_confusion_matrix(y, y_pred)
+    cm_dict = {
+        'TP': int(cm[1, 1]),
+        'TN': int(cm[0, 0]),
+        'FP': int(cm[0, 1]),
+        'FN': int(cm[1, 0])
+    }
+    
+    print(f"  Accuracy:  {accuracy:.4f}")
+    print(f"  Precision: {precision:.4f}")
+    print(f"  Recall:    {recall:.4f}")
+    print(f"  F1-Score:  {f1:.4f}")
+    print(f"\n  Optimized Thresholds:")
+    print(f"    Normal Range:    < {best_threshold[0]:.2f}")
+    print(f"    Abnormal Range:  >= {best_threshold[1]:.2f}")
+    
+    print("\n📊 Generating BPM Timeline Visualizations (1-40)...")
     results_dir = Path(__file__).parent / 'results'
     results_dir.mkdir(exist_ok=True)
     
@@ -249,26 +181,44 @@ def run_pso_analysis(algorithm_type='standard'):
         try:
             output_path = results_dir / f"{subject_key}_bpm_timeline.png"
             BPMVisualizer.plot_bpm_timeline(subject_key, subject_data, 'PSO', output_path)
-            print(f"  ✓ {subject_key}: {output_path.name}")
+            if i % 5 == 0 or i == len(data):
+                print(f"  ✓ Generated {i}/{len(data)} timeline visualizations")
         except Exception as e:
-            print(f"  ✗ {subject_key}: Error - {e}")
+            print(f"  ✗ {subject_key}: {e}")
     
-    # Plot convergence
     print("\n📊 Generating Convergence Plot...")
     convergence_path = results_dir / "pso_fitness_convergence.png"
-    generations = list(range(1, len(fitness_history) + 1))
-    BPMVisualizer.plot_fitness_convergence(generations, fitness_history, 'PSO', convergence_path)
-    print(f"  ✓ Convergence plot saved: {convergence_path.name}")
+    iterations = list(range(1, len(pso.fitness_history) + 1))
+    BPMVisualizer.plot_fitness_convergence(iterations, pso.fitness_history, 'PSO', convergence_path)
+    print(f"  ✓ Saved: pso_fitness_convergence.png")
     
-    # Save results
+    print("\n📊 Generating Threshold Distribution Plot...")
+    threshold_path = results_dir / "pso_threshold_distribution.png"
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.hist(X_bpm[y == 0], bins=30, alpha=0.6, label='Normal', color='#95E1D3')
+    ax.hist(X_bpm[y == 1], bins=30, alpha=0.6, label='Abnormal', color='#FF6B6B')
+    ax.axvline(best_threshold[0], color='#4ECDC4', linestyle='--', linewidth=2.5, 
+               label=f'Normal: {best_threshold[0]:.2f}')
+    ax.axvline(best_threshold[1], color='#FF6B6B', linestyle='--', linewidth=2.5,
+               label=f'Abnormal: {best_threshold[1]:.2f}')
+    ax.set_xlabel('BPM (Mean)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Frequency', fontsize=12, fontweight='bold')
+    ax.set_title('BPM Distribution with Optimized Thresholds (PSO)', fontsize=13, fontweight='bold')
+    ax.legend(fontsize=10)
+    ax.grid(axis='y', alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(threshold_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  ✓ Saved: pso_threshold_distribution.png")
+    
     print("\n💾 Saving Results...")
     results = {
         'algorithm': 'PSO',
         'timestamp': datetime.now().isoformat(),
-        'best_thresholds': {
-            'normal_min': float(best_thresholds[0]),
-            'normal_max': float(best_thresholds[1]),
-            'elevated_max': float(best_thresholds[2])
+        'optimized_thresholds': {
+            'normal_upper': float(best_threshold[0]),
+            'abnormal_lower': float(best_threshold[1])
         },
         'metrics': {
             'accuracy': float(accuracy),
@@ -276,37 +226,24 @@ def run_pso_analysis(algorithm_type='standard'):
             'recall': float(recall),
             'f1_score': float(f1)
         },
-        'confusion_matrix': {
-            'TP': int(cm['TP']),
-            'TN': int(cm['TN']),
-            'FP': int(cm['FP']),
-            'FN': int(cm['FN'])
-        },
-        'best_fitness': float(best_fitness),
-        'total_iterations': len(fitness_history)
+        'confusion_matrix': cm_dict,
+        'best_fitness': float(best_fitness)
     }
     
     results_file = results_dir / 'pso_results.json'
-    import json
     with open(results_file, 'w') as f:
         json.dump(results, f, indent=2)
-    print(f"  ✓ Results saved: {results_file.name}")
+    print(f"  ✓ Saved: pso_results.json")
     
-    print("\n" + "="*70)
+    print("\n" + "="*75)
     print("✅ PSO ANALYSIS COMPLETE!")
-    print("="*70)
+    print("="*75)
+    print(f"\n📁 Generated {len(list(results_dir.glob('orang_*_bpm_timeline.png')))} timeline visualizations")
+    print(f"📊 Convergence & Threshold distribution plots generated")
+    print(f"💾 Results saved to JSON\n")
     
-    return pso, best_thresholds, results
+    return pso, best_threshold, results
 
 
 if __name__ == "__main__":
-    # Run PSO analysis
-    pso, best_thresholds, results = run_pso_analysis(algorithm_type='standard')
-    
-    print("\n" + "="*70)
-    print("📁 Output Files:")
-    print("="*70)
-    results_dir = Path(__file__).parent / 'results'
-    for file in sorted(results_dir.glob('*.png')):
-        print(f"  📊 {file.name}")
-    print(f"  📄 pso_results.json")
+    pso, best_threshold, results = run_pso_analysis()
